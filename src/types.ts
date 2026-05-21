@@ -38,5 +38,8 @@ export interface HealthResponse {
     genericProviderModel: string;
     geminiEnabled: boolean;
     localFallbackEnabled: boolean;
+    geminiEnvStatus: "missing" | "placeholder" | "valid";
+    openRouterEnvStatus: "missing" | "placeholder" | "valid";
+    genericEnvStatus: "missing" | "placeholder" | "valid";
   };
 }

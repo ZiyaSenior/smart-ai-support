@@ -13,20 +13,29 @@ export function normalizeKey(key?: string): string | undefined {
   return normalized;
 }
 
-export function isValidKey(key?: string): boolean {
+export function getEnvStatus(key?: string): "missing" | "placeholder" | "valid" {
   const normalized = normalizeKey(key);
-  if (!normalized) return false;
+  if (!normalized) return "missing";
+
   const lc = normalized.toLowerCase();
-  return (
-    lc !== "" &&
-    !lc.includes("your_api_key_here") &&
-    !lc.includes("placeholder") &&
-    !lc.includes("my_gemini_api_key") &&
-    !lc.includes("your_openrouter_api_key") &&
-    lc !== "none" &&
-    lc !== "null" &&
-    lc !== "undefined"
-  );
+  if (
+    lc === "" ||
+    lc.includes("your_api_key_here") ||
+    lc.includes("placeholder") ||
+    lc.includes("my_gemini_api_key") ||
+    lc.includes("your_openrouter_api_key") ||
+    lc === "none" ||
+    lc === "null" ||
+    lc === "undefined"
+  ) {
+    return "placeholder";
+  }
+
+  return "valid";
+}
+
+export function isValidKey(key?: string): boolean {
+  return getEnvStatus(key) === "valid";
 }
 
 export function generateLocalModelResponse(message: string): string {
@@ -249,6 +258,9 @@ export function getHealthResponse(): HealthResponse {
       genericProviderModel: process.env.AI_API_MODEL || "gpt-3.5-turbo",
       geminiEnabled: isValidKey(process.env.GEMINI_API_KEY),
       localFallbackEnabled: process.env.LOCAL_FALLBACK_ENABLED !== "false",
+      geminiEnvStatus: getEnvStatus(process.env.GEMINI_API_KEY),
+      openRouterEnvStatus: getEnvStatus(process.env.OPENROUTER_API_KEY),
+      genericEnvStatus: getEnvStatus(process.env.AI_API_KEY),
     },
   };
 }

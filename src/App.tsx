@@ -410,26 +410,32 @@ export default function App() {
                 </li>
                 <li className="flex justify-between">
                   <span className="text-slate-500">OPENROUTER</span>
-                  {health?.config?.openRouterEnabled ? (
+                  {health?.config?.openRouterEnvStatus === "valid" ? (
                     <span className="text-indigo-600 font-bold">READY</span>
+                  ) : health?.config?.openRouterEnvStatus === "placeholder" ? (
+                    <span className="text-amber-500 font-bold">INVALID</span>
                   ) : (
-                    <span className="text-slate-400 font-bold">OFFLINE</span>
+                    <span className="text-slate-400 font-bold">MISSING</span>
                   )}
                 </li>
                 <li className="flex justify-between">
                   <span className="text-slate-500">GENERIC</span>
-                  {health?.config?.genericProviderEnabled ? (
+                  {health?.config?.genericEnvStatus === "valid" ? (
                     <span className="text-indigo-600 font-bold">READY</span>
+                  ) : health?.config?.genericEnvStatus === "placeholder" ? (
+                    <span className="text-amber-500 font-bold">INVALID</span>
                   ) : (
-                    <span className="text-slate-400 font-bold">OFFLINE</span>
+                    <span className="text-slate-400 font-bold">MISSING</span>
                   )}
                 </li>
                 <li className="flex justify-between">
                   <span className="text-slate-500">GEMINI</span>
-                  {health?.config?.geminiEnabled ? (
+                  {health?.config?.geminiEnvStatus === "valid" ? (
                     <span className="text-indigo-600 font-bold">READY</span>
+                  ) : health?.config?.geminiEnvStatus === "placeholder" ? (
+                    <span className="text-amber-500 font-bold">INVALID</span>
                   ) : (
-                    <span className="text-slate-400 font-bold">OFFLINE</span>
+                    <span className="text-slate-400 font-bold">MISSING</span>
                   )}
                 </li>
                 <li className="flex justify-between">
