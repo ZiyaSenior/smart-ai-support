@@ -4,18 +4,28 @@ import type { HealthResponse } from "../src/types";
 
 dotenv.config();
 
+export function normalizeKey(key?: string): string | undefined {
+  if (!key) return undefined;
+  let normalized = key.trim();
+  if ((normalized.startsWith('"') && normalized.endsWith('"')) || (normalized.startsWith("'") && normalized.endsWith("'"))) {
+    normalized = normalized.slice(1, -1).trim();
+  }
+  return normalized;
+}
+
 export function isValidKey(key?: string): boolean {
-  if (!key) return false;
-  const normalized = key.trim().toLowerCase();
+  const normalized = normalizeKey(key);
+  if (!normalized) return false;
+  const lc = normalized.toLowerCase();
   return (
-    normalized !== "" &&
-    !normalized.includes("your_api_key_here") &&
-    !normalized.includes("placeholder") &&
-    !normalized.includes("my_gemini_api_key") &&
-    !normalized.includes("your_openrouter_api_key") &&
-    normalized !== "none" &&
-    normalized !== "null" &&
-    normalized !== "undefined"
+    lc !== "" &&
+    !lc.includes("your_api_key_here") &&
+    !lc.includes("placeholder") &&
+    !lc.includes("my_gemini_api_key") &&
+    !lc.includes("your_openrouter_api_key") &&
+    lc !== "none" &&
+    lc !== "null" &&
+    lc !== "undefined"
   );
 }
 
@@ -114,7 +124,7 @@ export async function sendMessageToAI(message: string): Promise<{ text: string; 
     }
   }
 
-  const openRouterKey = process.env.OPENROUTER_API_KEY;
+  const openRouterKey = normalizeKey(process.env.OPENROUTER_API_KEY);
   if (isValidKey(openRouterKey)) {
     try {
       const url = process.env.OPENROUTER_URL || "https://openrouter.ai/api/v1/chat/completions";
@@ -155,7 +165,7 @@ export async function sendMessageToAI(message: string): Promise<{ text: string; 
     }
   }
 
-  const aiApiKey = process.env.AI_API_KEY;
+  const aiApiKey = normalizeKey(process.env.AI_API_KEY);
   if (isValidKey(aiApiKey)) {
     try {
       const url = process.env.AI_API_URL || "https://api.openai.com/v1/chat/completions";
@@ -194,7 +204,7 @@ export async function sendMessageToAI(message: string): Promise<{ text: string; 
     }
   }
 
-  const geminiKey = process.env.GEMINI_API_KEY;
+  const geminiKey = normalizeKey(process.env.GEMINI_API_KEY);
   if (isValidKey(geminiKey)) {
     try {
       const ai = new GoogleGenAI({

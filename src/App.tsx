@@ -341,6 +341,10 @@ export default function App() {
             <span className="text-xs font-medium text-slate-700">
               {health?.config?.geminiEnabled
                 ? "Google Gemini 3.5"
+                : health?.config?.openRouterEnabled
+                ? "OpenRouter"
+                : health?.config?.genericProviderEnabled
+                ? `${health?.config?.genericProviderModel || "Generic"}`
                 : health?.config?.localModelEnabled
                 ? `${health?.config?.localModelName || "distilgpt2"} (Local)`
                 : "Static Fallback"}
@@ -407,6 +411,22 @@ export default function App() {
                 <li className="flex justify-between">
                   <span className="text-slate-500">OPENROUTER</span>
                   {health?.config?.openRouterEnabled ? (
+                    <span className="text-indigo-600 font-bold">READY</span>
+                  ) : (
+                    <span className="text-slate-400 font-bold">OFFLINE</span>
+                  )}
+                </li>
+                <li className="flex justify-between">
+                  <span className="text-slate-500">GENERIC</span>
+                  {health?.config?.genericProviderEnabled ? (
+                    <span className="text-indigo-600 font-bold">READY</span>
+                  ) : (
+                    <span className="text-slate-400 font-bold">OFFLINE</span>
+                  )}
+                </li>
+                <li className="flex justify-between">
+                  <span className="text-slate-500">GEMINI</span>
+                  {health?.config?.geminiEnabled ? (
                     <span className="text-indigo-600 font-bold">READY</span>
                   ) : (
                     <span className="text-slate-400 font-bold">OFFLINE</span>
