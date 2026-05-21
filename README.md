@@ -48,6 +48,9 @@ This project is configured for Vercel deployment using a static frontend build p
 1. Push your repository to GitHub.
 2. Create a new Vercel project and connect your repo.
 3. Set `GEMINI_API_KEY` in Vercel Environment Variables.
+   - Do not include surrounding quotes in the Vercel value.
+   - Set it for the Preview environment if you are testing a preview deployment.
+   - Vercel does not automatically load `.env` from your repo.
 4. Use the default build command:
 
 ```bash
