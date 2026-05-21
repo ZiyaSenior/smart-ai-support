@@ -1,8 +1,25 @@
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
-import type { HealthResponse } from "../src/types";
 
 dotenv.config();
+
+interface HealthResponse {
+  status: string;
+  timestamp: string;
+  config: {
+    localModelEnabled: boolean;
+    localModelName: string;
+    openRouterEnabled: boolean;
+    openRouterModel: string;
+    genericProviderEnabled: boolean;
+    genericProviderModel: string;
+    geminiEnabled: boolean;
+    localFallbackEnabled: boolean;
+    geminiEnvStatus: "missing" | "placeholder" | "valid";
+    openRouterEnvStatus: "missing" | "placeholder" | "valid";
+    genericEnvStatus: "missing" | "placeholder" | "valid";
+  };
+}
 
 export function normalizeKey(key?: string): string | undefined {
   if (!key) return undefined;
@@ -124,12 +141,32 @@ We are currently operating in offline-only fallback mode. All remote AI integrat
 }
 
 export async function sendMessageToAI(message: string): Promise<{ text: string; provider: string }> {
-  if (process.env.LOCAL_MODEL_ENABLED === "true") {
+  const geminiKey = normalizeKey(process.env.GEMINI_API_KEY);
+  if (isValidKey(geminiKey)) {
     try {
-      const responseText = generateLocalModelResponse(message);
-      return { text: responseText, provider: `Local Edge Model (${process.env.LOCAL_MODEL_NAME || "distilgpt2"})` };
+      const ai = new GoogleGenAI({
+        apiKey: geminiKey,
+        httpOptions: {
+          headers: {
+            "User-Agent": "aistudio-build",
+          },
+        },
+      });
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: message,
+        config: {
+          systemInstruction: "You are an expert customer support agent. Help the user solve their issue in a professional, concise, empathetic manner. Use Markdown formatting features such as headers, lists, and bold text.",
+        },
+      });
+
+      const responseText = response.text;
+      if (responseText) {
+        return { text: responseText, provider: "Google Gemini 3.5 Flash (Server SDK)" };
+      }
     } catch (err: any) {
-      console.error(`[Tier 1: LOCAL] Execution failed:`, err?.message || err);
+      console.error("[Tier 1: GEMINI] Gemini API content generation failed:", err?.message || err);
     }
   }
 
@@ -213,32 +250,12 @@ export async function sendMessageToAI(message: string): Promise<{ text: string; 
     }
   }
 
-  const geminiKey = normalizeKey(process.env.GEMINI_API_KEY);
-  if (isValidKey(geminiKey)) {
+  if (process.env.LOCAL_MODEL_ENABLED === "true") {
     try {
-      const ai = new GoogleGenAI({
-        apiKey: geminiKey,
-        httpOptions: {
-          headers: {
-            "User-Agent": "aistudio-build",
-          },
-        },
-      });
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: message,
-        config: {
-          systemInstruction: "You are an expert customer support agent. Help the user solve their issue in a professional, concise, empathetic manner. Use Markdown formatting features such as headers, lists, and bold text.",
-        },
-      });
-
-      const responseText = response.text;
-      if (responseText) {
-        return { text: responseText, provider: "Google Gemini 3.5 Flash (Server SDK)" };
-      }
+      const responseText = generateLocalModelResponse(message);
+      return { text: responseText, provider: `Local Edge Model (${process.env.LOCAL_MODEL_NAME || "distilgpt2"})` };
     } catch (err: any) {
-      console.error("[Tier 4: GEMINI] Gemini API content generation failed:", err?.message || err);
+      console.error(`[Tier 4: LOCAL] Execution failed:`, err?.message || err);
     }
   }
 
