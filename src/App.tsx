@@ -32,6 +32,15 @@ export default function App() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [connectionError, setConnectionError] = useState(false);
 
+  const STORAGE_KEY = "smart-ai-support-history";
+  const initialWelcomeMessage: Message = {
+    id: "welcome-message",
+    sender: "bot",
+    text: "Hello! I am your resilient Smart AI Customer Support Assistant. I am configured with multiple fallback layers, meaning I can answer your questions locally on the edge, via OpenRouter/Generic API endpoints, using Gemini 3.5 Flash, or through our offline fallback base. How can I help you today?",
+    timestamp: Date.now(),
+    providerUsed: "System Welcome",
+  };
+
   // Audio effect context for simulated keystroke / bot notifications
   const [soundEnabled] = useState(false);
 
@@ -66,14 +75,34 @@ export default function App() {
     },
   ];
 
-  // Load chat history and health status on mount
+  // Load saved conversation and health status on mount
   useEffect(() => {
-    fetchHistory();
+    const saved = window.localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+        } else {
+          setMessages([initialWelcomeMessage]);
+        }
+      } catch {
+        setMessages([initialWelcomeMessage]);
+      }
+    } else {
+      setMessages([initialWelcomeMessage]);
+    }
+
     fetchHealthStatus();
-    // Poll health status occasionally to monitor connections
     const interval = setInterval(fetchHealthStatus, 15000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (messages.length > 0) {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+    }
+  }, [messages]);
 
   // Safe window scrolling to keep conversations fully aligned with latest answer
   useEffect(() => {
@@ -81,23 +110,6 @@ export default function App() {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
   }, [messages, isLoading, loadingStep]);
-
-  // Read chat history from Express API
-  const fetchHistory = async () => {
-    try {
-      const response = await fetch("/api/history");
-      if (response.ok) {
-        const data = await response.json();
-        setMessages(data.history || []);
-        setConnectionError(false);
-      } else {
-        setConnectionError(true);
-      }
-    } catch (err) {
-      console.error("Failed to load conversation history:", err);
-      setConnectionError(true);
-    }
-  };
 
   // Read backend configuration and diagnostic parameters
   const fetchHealthStatus = async () => {
@@ -160,9 +172,15 @@ export default function App() {
 
       if (response.ok) {
         const data = await response.json();
-        setMessages(data.history || []);
+        const botMessage: Message = {
+          id: "bot_" + Date.now(),
+          sender: "bot",
+          text: data.response,
+          timestamp: Date.now(),
+          providerUsed: data.providerUsed,
+        };
+        setMessages((prev) => [...prev, botMessage]);
       } else {
-        // Safe UI errors
         const errorMsg: Message = {
           id: "error_" + Date.now(),
           sender: "bot",
@@ -304,7 +322,6 @@ export default function App() {
           <button
             onClick={() => {
               fetchHealthStatus();
-              fetchHistory();
             }}
             className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition flex items-center gap-1 cursor-pointer"
             title="Full dynamic check"

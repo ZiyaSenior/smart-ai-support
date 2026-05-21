@@ -35,11 +35,26 @@ If you want to disable the local edge model and force Gemini or remote providers
 LOCAL_MODEL_ENABLED="false"
 ```
 
-### Run
+### Run locally
 
 ```bash
 npm run dev
 ```
+
+### Deploy on Vercel
+
+This project is configured for Vercel deployment using a static frontend build plus serverless API functions.
+
+1. Push your repository to GitHub.
+2. Create a new Vercel project and connect your repo.
+3. Set `GEMINI_API_KEY` in Vercel Environment Variables.
+4. Use the default build command:
+
+```bash
+npm run build
+```
+
+Vercel will serve the built Vite app from `dist/` and handle `/api/chat` and `/api/health` through serverless functions.
 
 ## Notes
 
