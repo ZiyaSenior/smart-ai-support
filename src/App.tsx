@@ -31,6 +31,7 @@ export default function App() {
   const [loadingStep, setLoadingStep] = useState("");
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [connectionError, setConnectionError] = useState(false);
+  const [healthError, setHealthError] = useState<string | null>(null);
 
   const STORAGE_KEY = "smart-ai-support-history";
   const initialWelcomeMessage: Message = {
@@ -119,11 +120,15 @@ export default function App() {
         const data: HealthResponse = await response.json();
         setHealth(data);
         setConnectionError(false);
+        setHealthError(null);
       } else {
+        const text = await response.text();
+        setHealthError(`Health API returned ${response.status}: ${text}`);
         setConnectionError(true);
       }
     } catch (err) {
       console.error("Failed to fetch backend health data:", err);
+      setHealthError(String(err));
       setConnectionError(true);
     }
   };
@@ -450,6 +455,12 @@ export default function App() {
               <span className="text-emerald-500">SYSTEM LOG: </span>
               <span>Loaded fallback pipeline</span>
             </div>
+            {healthError && (
+              <div className="bg-rose-950 text-[10px] text-rose-200 font-mono rounded-lg p-3 mt-3 leading-normal">
+                <div className="font-bold uppercase tracking-wider text-rose-300 mb-1">Health check failed</div>
+                <div>{healthError}</div>
+              </div>
+            )}
           </div>
         </aside>
 
