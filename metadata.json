@@ -1,0 +1,6 @@
+{
+  "name": "Smart AI Customer Support Assistant",
+  "description": "An intelligent customer support chat assistant with multi-provider fallbacks (local, OpenRouter, and generic remote models) and offline resilience.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
