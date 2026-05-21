@@ -1,20 +1,48 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Smart AI Support
 
-# Run and deploy your AI Studio app
+A lightweight AI customer support app built with Vite, React, and Express. It supports multiple AI providers with a fallback stack that includes Gemini, OpenRouter, a generic API provider, and a local edge model.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/a61f2eeb-1be7-48ed-8bff-0a5c3f949d23
+- Multi-tier fallback AI pipeline
+- Server-side Gemini integration using `@google/genai`
+- Express API backend for chat and health endpoints
+- React frontend with support status and chat history
 
-## Run Locally
+## Local Setup
 
-**Prerequisites:**  Node.js
+### Prerequisites
 
+- Node.js installed
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### Install
+
+```bash
+npm install
+```
+
+### Configure
+
+Create or update `.env.local` with your Gemini API key:
+
+```env
+GEMINI_API_KEY="your_gemini_api_key_here"
+```
+
+If you want to disable the local edge model and force Gemini or remote providers instead, set:
+
+```env
+LOCAL_MODEL_ENABLED="false"
+```
+
+### Run
+
+```bash
+npm run dev
+```
+
+## Notes
+
+- The local model in this app is a simulated fallback and is not equivalent to Gemini.
+- If `LOCAL_MODEL_ENABLED` is `true`, the app will use the local model first and only fall back to Gemini if local generation fails.
+- Make sure your environment variables are loaded before starting the server.
