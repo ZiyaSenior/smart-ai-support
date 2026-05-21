@@ -56,3 +56,4 @@ http://127.0.0.1:8000
 
 > Əgər `npm` və Vite ilə bağlı problem varsa, bu statik HTML/JS versiyası terminaldan asılı deyil və birbaşa işləyir.
 dev1
+ziya
