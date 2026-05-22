@@ -6,7 +6,7 @@ export const config = {
     bodyParser: true,
   },
 };
-
+// This function attempts to parse the request body as JSON if it's a string, or directly if it's already an object.
 function parseBody(req: VercelRequest): { message?: string } {
   if (req.body && typeof req.body === "object") {
     return req.body as { message?: string };
@@ -21,6 +21,7 @@ function parseBody(req: VercelRequest): { message?: string } {
   return {};
 }
 
+// This is the main handler function for the /api/chat endpoint. It processes incoming POST requests, validates the message content, and interacts with the AI provider to get a response.
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
