@@ -29,17 +29,12 @@ export interface HistoryResponse {
 export interface HealthResponse {
   status: string;
   timestamp: string;
+  build?: string;
   config: {
-    localModelEnabled: boolean;
-    localModelName: string;
-    openRouterEnabled: boolean;
-    openRouterModel: string;
-    genericProviderEnabled: boolean;
-    genericProviderModel: string;
-    geminiEnabled: boolean;
-    localFallbackEnabled: boolean;
-    geminiEnvStatus: "missing" | "placeholder" | "valid";
-    openRouterEnvStatus: "missing" | "placeholder" | "valid";
-    genericEnvStatus: "missing" | "placeholder" | "valid";
+    groqEnabled: boolean;
+    groqModel: string;
+    groqEnvStatus: "missing" | "placeholder" | "valid";
+    keyLength?: number;
+    onVercel?: boolean;
   };
 }

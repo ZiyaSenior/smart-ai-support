@@ -1,11 +1,40 @@
+import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { sendMessageToAI } from "./lib";
 
-export default async function handler(req: any, res: any) {
+export const config = {
+  api: {
+    bodyParser: true,
+  },
+};
+
+function parseBody(req: VercelRequest): { message?: string } {
+  if (req.body && typeof req.body === "object") {
+    return req.body as { message?: string };
+  }
+  if (typeof req.body === "string" && req.body.trim()) {
+    try {
+      return JSON.parse(req.body) as { message?: string };
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { message } = req.body || {};
+  const { message } = parseBody(req);
   if (!message || typeof message !== "string" || !message.trim()) {
     return res.status(400).json({ error: "Message content is required" });
   }
@@ -13,8 +42,9 @@ export default async function handler(req: any, res: any) {
   try {
     const { text, provider } = await sendMessageToAI(message.trim());
     return res.status(200).json({ response: text, providerUsed: provider });
-  } catch (err: any) {
-    console.error("[API] /api/chat error", err?.message || err);
-    return res.status(500).json({ error: "Internal server error" });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[API] /api/chat error", msg);
+    return res.status(500).json({ error: "Internal server error", details: msg });
   }
 }
