@@ -16,7 +16,6 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@google/genai": "^1.29.0",
     "lucide-react": "^0.546.0",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
@@ -25,6 +24,7 @@
     "motion": "^12.23.24"
   },
   "devDependencies": {
+    "@vercel/node": "^5.3.0",
     "@types/node": "^22.14.0",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",

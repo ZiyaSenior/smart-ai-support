@@ -30,16 +30,10 @@ export interface HealthResponse {
   status: string;
   timestamp: string;
   config: {
-    localModelEnabled: boolean;
-    localModelName: string;
-    openRouterEnabled: boolean;
-    openRouterModel: string;
-    genericProviderEnabled: boolean;
-    genericProviderModel: string;
     geminiEnabled: boolean;
-    localFallbackEnabled: boolean;
+    geminiModel: string;
     geminiEnvStatus: "missing" | "placeholder" | "valid";
-    openRouterEnvStatus: "missing" | "placeholder" | "valid";
-    genericEnvStatus: "missing" | "placeholder" | "valid";
+    keyLength?: number;
+    onVercel?: boolean;
   };
 }

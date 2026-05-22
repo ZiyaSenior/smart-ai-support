@@ -37,7 +37,7 @@ export default function App() {
   const initialWelcomeMessage: Message = {
     id: "welcome-message",
     sender: "bot",
-    text: "Hello! I am your resilient Smart AI Customer Support Assistant. I am configured with multiple fallback layers, meaning I can answer your questions locally on the edge, via OpenRouter/Generic API endpoints, using Gemini 3.5 Flash, or through our offline fallback base. How can I help you today?",
+    text: "Hello! I'm your Smart AI Support Assistant, powered by Google Gemini. How can I help you today?",
     timestamp: Date.now(),
     providerUsed: "System Welcome",
   };
@@ -142,13 +142,10 @@ export default function App() {
     setIsLoading(true);
 
     // Initial state: simulated dispatch log
-    setLoadingStep("1. Dispatching inquiry payload to support route...");
+    setLoadingStep("Sending message to Gemini...");
 
-    // Staggered status updates to transparently demonstrate the multi-tier fallback pipeline
     const ticks = [
-      { delay: 400, text: "2. Verifying local model status (Tier 1 fallback test)..." },
-      { delay: 1000, text: "3. Local edge models loading. Evaluating keyword classifier tokens..." },
-      { delay: 1600, text: "4. Executing inference weights for smart support answers..." },
+      { delay: 600, text: "Waiting for Gemini response..." },
     ];
 
     const timers = ticks.map((tick) =>
@@ -201,7 +198,7 @@ export default function App() {
       const offlineMsg: Message = {
         id: "offline_" + Date.now(),
         sender: "bot",
-        text: "### 📴 Sync Failure\nCould not communicate with the backend. Returning local memory response:\n\n*   Your current query hasn't reached remote servers.\n*   Please verify that port **3000** is listening successfully.\n*   We will attempt retry sync on your next input.",
+        text: "### 📴 Sync Failure\nCould not reach the API. Check that `/api/chat` is deployed and that your AI API keys are set in Vercel Environment Variables (then redeploy).",
         timestamp: Date.now(),
         providerUsed: "Offline Sandbox Catch",
       };
@@ -345,14 +342,8 @@ export default function App() {
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Active Model</span>
             <span className="text-xs font-medium text-slate-700">
               {health?.config?.geminiEnabled
-                ? "Google Gemini 3.5"
-                : health?.config?.openRouterEnabled
-                ? "OpenRouter"
-                : health?.config?.genericProviderEnabled
-                ? `${health?.config?.genericProviderModel || "Generic"}`
-                : health?.config?.localModelEnabled
-                ? `${health?.config?.localModelName || "distilgpt2"} (Local)`
-                : "Static Fallback"}
+                ? health.config.geminiModel
+                : "Not configured"}
             </span>
           </div>
         </div>
@@ -406,35 +397,7 @@ export default function App() {
               <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Environment Status</h3>
               <ul className="space-y-2 font-mono text-[10px]">
                 <li className="flex justify-between">
-                  <span className="text-slate-500">LOCAL_MODEL</span>
-                  {health?.config?.localModelEnabled ? (
-                    <span className="text-emerald-600 font-bold">ENABLED</span>
-                  ) : (
-                    <span className="text-slate-400 font-bold">DISABLED</span>
-                  )}
-                </li>
-                <li className="flex justify-between">
-                  <span className="text-slate-500">OPENROUTER</span>
-                  {health?.config?.openRouterEnvStatus === "valid" ? (
-                    <span className="text-indigo-600 font-bold">READY</span>
-                  ) : health?.config?.openRouterEnvStatus === "placeholder" ? (
-                    <span className="text-amber-500 font-bold">INVALID</span>
-                  ) : (
-                    <span className="text-slate-400 font-bold">MISSING</span>
-                  )}
-                </li>
-                <li className="flex justify-between">
-                  <span className="text-slate-500">GENERIC</span>
-                  {health?.config?.genericEnvStatus === "valid" ? (
-                    <span className="text-indigo-600 font-bold">READY</span>
-                  ) : health?.config?.genericEnvStatus === "placeholder" ? (
-                    <span className="text-amber-500 font-bold">INVALID</span>
-                  ) : (
-                    <span className="text-slate-400 font-bold">MISSING</span>
-                  )}
-                </li>
-                <li className="flex justify-between">
-                  <span className="text-slate-500">GEMINI</span>
+                  <span className="text-slate-500">GEMINI_API_KEY</span>
                   {health?.config?.geminiEnvStatus === "valid" ? (
                     <span className="text-indigo-600 font-bold">READY</span>
                   ) : health?.config?.geminiEnvStatus === "placeholder" ? (
@@ -444,8 +407,22 @@ export default function App() {
                   )}
                 </li>
                 <li className="flex justify-between">
-                  <span className="text-slate-500">FALLBACK</span>
-                  <span className="text-emerald-600 font-bold">READY</span>
+                  <span className="text-slate-500">MODEL</span>
+                  <span className="text-slate-600 font-bold truncate max-w-[8rem]">
+                    {health?.config?.geminiModel || "—"}
+                  </span>
+                </li>
+                <li className="flex justify-between">
+                  <span className="text-slate-500">KEY_LEN</span>
+                  <span className="text-slate-600 font-bold">
+                    {health?.config?.keyLength ?? 0}
+                  </span>
+                </li>
+                <li className="flex justify-between">
+                  <span className="text-slate-500">VERCEL</span>
+                  <span className="text-slate-600 font-bold">
+                    {health?.config?.onVercel ? "YES" : "NO"}
+                  </span>
                 </li>
               </ul>
             </div>
@@ -453,7 +430,7 @@ export default function App() {
             {/* Simulated Live Terminal output inside Sidebar */}
             <div className="bg-slate-900 text-[9px] text-slate-400 font-mono rounded-lg p-2.5 leading-normal">
               <span className="text-emerald-500">SYSTEM LOG: </span>
-              <span>Loaded fallback pipeline</span>
+              <span>Gemini-only routing</span>
             </div>
             {healthError && (
               <div className="bg-rose-950 text-[10px] text-rose-200 font-mono rounded-lg p-3 mt-3 leading-normal">
@@ -533,7 +510,7 @@ export default function App() {
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-indigo-600 animate-ping" />
                     <span className="text-[10px] text-slate-400 font-mono tracking-wider font-semibold">
-                      RESOLVING FALLBACK TIER STACK...
+                      CALLING GEMINI...
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 font-mono bg-slate-50 p-2 rounded border border-slate-150 truncate">
@@ -580,7 +557,7 @@ export default function App() {
               </button>
             </form>
             <div className="mt-3 text-center text-[10px] text-slate-400 uppercase tracking-widest font-bold">
-              Auto-failover enabled: Local &gt; Remote &gt; Static Fallback
+              Powered by Google Gemini
             </div>
           </div>
         </main>
