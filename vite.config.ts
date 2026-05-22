@@ -3,6 +3,9 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
 
+// https://vitejs.dev/config/
+// Note: If you modify this file, please also update the corresponding configuration in .vscode/launch.json for debugging.
+// The TypeScript configuration in tsconfig.json should also be updated if you change the target or module settings here.
 export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
