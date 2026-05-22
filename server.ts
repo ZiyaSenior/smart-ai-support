@@ -13,6 +13,7 @@ const app = express();
 const PORT = 3000;
 
 app.use(express.json());
+// In-memory chat history. In production, consider using a database or persistent storage.
 
 let chatHistory: Message[] = [
   {
