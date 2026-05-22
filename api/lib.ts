@@ -5,12 +5,7 @@ if (!process.env.VERCEL) {
   dotenv.config({ path: ".env" });
 }
 
-const GEMINI_MODELS = [
-  process.env.GEMINI_MODEL,
-  "gemini-2.0-flash",
-  "gemini-1.5-flash",
-  "gemini-1.5-flash-8b",
-].filter((m): m is string => Boolean(m));
+const DEFAULT_MODEL = "gemini-2.0-flash";
 
 export interface HealthResponse {
   status: string;
@@ -31,7 +26,6 @@ export function getGeminiApiKey(): string | undefined {
   if (!raw) return undefined;
 
   let key = raw.trim();
-  // Strip wrapping quotes (common when copying from .env files)
   while (
     (key.startsWith('"') && key.endsWith('"')) ||
     (key.startsWith("'") && key.endsWith("'"))
@@ -39,6 +33,11 @@ export function getGeminiApiKey(): string | undefined {
     key = key.slice(1, -1).trim();
   }
   return key || undefined;
+}
+
+export function getGeminiModel(): string {
+  const configured = process.env.GEMINI_MODEL?.trim();
+  return configured || DEFAULT_MODEL;
 }
 
 export function getEnvStatus(): "missing" | "placeholder" | "valid" {
@@ -68,23 +67,14 @@ export function isValidKey(): boolean {
 }
 
 function noGeminiKeyMessage(): string {
-  return `### Gemini not configured on the server
+  return `### Gemini not configured
 
-Your **.env file is not deployed to Vercel** (gitignored). You must add the key in the Vercel dashboard:
-
-1. Vercel → your project → **Settings** → **Environment Variables**
-2. Name: \`GEMINI_API_KEY\` — Value: paste key **without quotes**
-3. Check **Production** and **Preview**
-4. **Deployments** → ⋯ → **Redeploy**
-
-Then open \`/api/health\` — \`geminiEnvStatus\` should be \`valid\`.`;
+Add \`GEMINI_API_KEY\` in Vercel → Settings → Environment Variables (no quotes), then redeploy.`;
 }
 
-function geminiFailedMessage(): string {
+function geminiFailedMessage(model: string): string {
   const detail = lastGeminiError ? `\n\n**Error:** ${lastGeminiError}` : "";
-  return `### Gemini API error${detail}
-
-Try setting \`GEMINI_MODEL=gemini-2.0-flash\` in Vercel env vars, or create a new key at https://aistudio.google.com/apikey`;
+  return `### Could not reach Gemini (${model})${detail}`;
 }
 
 async function callGeminiOnce(apiKey: string, model: string, message: string): Promise<string | null> {
@@ -110,7 +100,7 @@ async function callGeminiOnce(apiKey: string, model: string, message: string): P
 
     if (!res.ok) {
       const errBody = await res.text();
-      let hint = `HTTP ${res.status} (${model})`;
+      let hint = `HTTP ${res.status}`;
       try {
         const parsed = JSON.parse(errBody) as { error?: { message?: string } };
         hint = parsed?.error?.message || hint;
@@ -124,12 +114,21 @@ async function callGeminiOnce(apiKey: string, model: string, message: string): P
 
     const data = (await res.json()) as {
       candidates?: { content?: { parts?: { text?: string }[] } }[];
+      promptFeedback?: { blockReason?: string };
     };
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) {
-      lastGeminiError = `Empty response (${model})`;
+
+    const blockReason = data?.promptFeedback?.blockReason;
+    if (blockReason) {
+      lastGeminiError = `Blocked: ${blockReason}`;
       return null;
     }
+
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) {
+      lastGeminiError = "Empty response from Gemini";
+      return null;
+    }
+
     lastGeminiError = "";
     return text;
   } catch (err: unknown) {
@@ -141,41 +140,30 @@ async function callGeminiOnce(apiKey: string, model: string, message: string): P
   }
 }
 
-async function callGemini(apiKey: string, message: string): Promise<{ text: string; model: string } | null> {
-  const models = [...new Set(GEMINI_MODELS)];
-
-  for (const model of models) {
-    const text = await callGeminiOnce(apiKey, model, message);
-    if (text) return { text, model };
-  }
-
-  return null;
-}
-
 export async function sendMessageToAI(message: string): Promise<{ text: string; provider: string }> {
   const geminiKey = getGeminiApiKey();
+  const model = getGeminiModel();
 
   if (!isValidKey() || !geminiKey) {
     return { text: noGeminiKeyMessage(), provider: "Configuration" };
   }
 
-  const result = await callGemini(geminiKey, message);
-  if (result) {
-    return { text: result.text, provider: `Google Gemini (${result.model})` };
+  const text = await callGeminiOnce(geminiKey, model, message);
+  if (text) {
+    return { text, provider: `Google Gemini (${model})` };
   }
 
-  return { text: geminiFailedMessage(), provider: "Gemini Error" };
+  return { text: geminiFailedMessage(model), provider: "Gemini Error" };
 }
 
 export function getHealthResponse(): HealthResponse {
   const key = getGeminiApiKey();
-  const models = [...new Set(GEMINI_MODELS)];
   return {
     status: "ok",
     timestamp: new Date().toISOString(),
     config: {
       geminiEnabled: isValidKey(),
-      geminiModel: models[0] || "gemini-2.0-flash",
+      geminiModel: getGeminiModel(),
       geminiEnvStatus: getEnvStatus(),
       keyLength: key?.length ?? 0,
       onVercel: Boolean(process.env.VERCEL),

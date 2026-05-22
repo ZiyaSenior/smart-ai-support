@@ -33,7 +33,7 @@ export default function App() {
   const [connectionError, setConnectionError] = useState(false);
   const [healthError, setHealthError] = useState<string | null>(null);
 
-  const STORAGE_KEY = "smart-ai-support-history";
+  const STORAGE_KEY = "smart-ai-support-v3";
   const initialWelcomeMessage: Message = {
     id: "welcome-message",
     sender: "bot",
@@ -172,23 +172,24 @@ export default function App() {
       // Cancel simulated ticks
       timers.forEach(clearTimeout);
 
-      if (response.ok) {
-        const data = await response.json();
+      const data = await response.json().catch(() => ({} as { response?: string; error?: string; providerUsed?: string }));
+
+      if (response.ok && data.response) {
         const botMessage: Message = {
           id: "bot_" + Date.now(),
           sender: "bot",
           text: data.response,
           timestamp: Date.now(),
-          providerUsed: data.providerUsed,
+          providerUsed: data.providerUsed || "Gemini",
         };
         setMessages((prev) => [...prev, botMessage]);
       } else {
         const errorMsg: Message = {
           id: "error_" + Date.now(),
           sender: "bot",
-          text: "### ❌ Connection Throttled\nThe application is experiencing runtime request failures. Please verify your backend server is active and try again.",
+          text: data.response || `### API error (${response.status})\n\n${data.error || "Could not reach /api/chat. Redeploy and try again."}`,
           timestamp: Date.now(),
-          providerUsed: "Failover Handler",
+          providerUsed: data.providerUsed || "API Error",
         };
         setMessages((prev) => [...prev, errorMsg]);
       }
