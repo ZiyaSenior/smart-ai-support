@@ -5,7 +5,8 @@ if (!process.env.VERCEL) {
   dotenv.config({ path: ".env" });
 }
 
-const DEFAULT_MODEL = "gemini-2.0-flash";
+const DEFAULT_MODEL = "gemini-1.5-flash";
+const FALLBACK_MODEL = "gemini-1.5-flash";
 
 export interface HealthResponse {
   status: string;
@@ -40,6 +41,12 @@ export function getGeminiModel(): string {
   return configured || DEFAULT_MODEL;
 }
 
+function modelsToTry(): string[] {
+  const primary = getGeminiModel();
+  if (primary === FALLBACK_MODEL) return [primary];
+  return [primary, FALLBACK_MODEL];
+}
+
 export function getEnvStatus(): "missing" | "placeholder" | "valid" {
   const normalized = getGeminiApiKey();
   if (!normalized) return "missing";
@@ -66,15 +73,40 @@ export function isValidKey(): boolean {
   return getEnvStatus() === "valid";
 }
 
+function isQuotaError(msg: string): boolean {
+  const lc = msg.toLowerCase();
+  return (
+    lc.includes("quota") ||
+    lc.includes("rate limit") ||
+    lc.includes("rate-limit") ||
+    lc.includes("resource_exhausted") ||
+    lc.includes("limit: 0")
+  );
+}
+
 function noGeminiKeyMessage(): string {
   return `### Gemini not configured
 
 Add \`GEMINI_API_KEY\` in Vercel → Settings → Environment Variables (no quotes), then redeploy.`;
 }
 
-function geminiFailedMessage(model: string): string {
-  const detail = lastGeminiError ? `\n\n**Error:** ${lastGeminiError}` : "";
-  return `### Could not reach Gemini (${model})${detail}`;
+function quotaExceededMessage(triedModels: string[]): string {
+  return `### Gemini quota exceeded
+
+Your Google API free tier for **${triedModels.join(", ")}** is used up or not enabled on this key.
+
+**Try this:**
+1. In Vercel, set \`GEMINI_MODEL\` to \`gemini-1.5-flash\` (or remove it to use the default), then **Redeploy**
+2. Wait a few minutes and send again
+3. Enable billing: [Google AI Studio](https://aistudio.google.com/) → Settings
+4. Or create a new API key: https://aistudio.google.com/apikey
+
+Your app and API key are working — this is a **Google usage limit**, not a Vercel bug.`;
+}
+
+function geminiFailedMessage(triedModels: string[]): string {
+  const detail = lastGeminiError ? `\n\n**Details:** ${lastGeminiError.slice(0, 400)}` : "";
+  return `### Could not reach Gemini (${triedModels.join(" → ")})${detail}`;
 }
 
 async function callGeminiOnce(apiKey: string, model: string, message: string): Promise<string | null> {
@@ -105,7 +137,7 @@ async function callGeminiOnce(apiKey: string, model: string, message: string): P
         const parsed = JSON.parse(errBody) as { error?: { message?: string } };
         hint = parsed?.error?.message || hint;
       } catch {
-        hint = errBody.slice(0, 300) || hint;
+        hint = errBody.slice(0, 400) || hint;
       }
       lastGeminiError = hint;
       console.error("[GEMINI]", model, hint);
@@ -142,18 +174,25 @@ async function callGeminiOnce(apiKey: string, model: string, message: string): P
 
 export async function sendMessageToAI(message: string): Promise<{ text: string; provider: string }> {
   const geminiKey = getGeminiApiKey();
-  const model = getGeminiModel();
 
   if (!isValidKey() || !geminiKey) {
     return { text: noGeminiKeyMessage(), provider: "Configuration" };
   }
 
-  const text = await callGeminiOnce(geminiKey, model, message);
-  if (text) {
-    return { text, provider: `Google Gemini (${model})` };
+  const models = modelsToTry();
+
+  for (const model of models) {
+    const text = await callGeminiOnce(geminiKey, model, message);
+    if (text) {
+      return { text, provider: `Google Gemini (${model})` };
+    }
   }
 
-  return { text: geminiFailedMessage(model), provider: "Gemini Error" };
+  if (isQuotaError(lastGeminiError)) {
+    return { text: quotaExceededMessage(models), provider: "Quota" };
+  }
+
+  return { text: geminiFailedMessage(models), provider: "Gemini Error" };
 }
 
 export function getHealthResponse(): HealthResponse {
