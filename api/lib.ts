@@ -5,12 +5,23 @@ if (!process.env.VERCEL) {
   dotenv.config({ path: ".env" });
 }
 
-const DEFAULT_MODEL = "gemini-1.5-flash";
-const FALLBACK_MODEL = "gemini-1.5-flash";
+/** Models that exist on generativelanguage.googleapis.com v1beta (2026). */
+const SUPPORTED_MODELS = [
+  "gemini-2.0-flash-lite",
+  "gemini-2.0-flash",
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-preview-05-20",
+] as const;
+
+const DEFAULT_MODEL = "gemini-2.0-flash-lite";
+
+/** Bump when deploying — shown in /api/health so you know Vercel picked up the latest code. */
+export const API_BUILD = "gemini-v4-no-15";
 
 export interface HealthResponse {
   status: string;
   timestamp: string;
+  build: string;
   config: {
     geminiEnabled: boolean;
     geminiModel: string;
@@ -37,14 +48,13 @@ export function getGeminiApiKey(): string | undefined {
 }
 
 export function getGeminiModel(): string {
-  const configured = process.env.GEMINI_MODEL?.trim();
-  return configured || DEFAULT_MODEL;
+  return process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
 }
 
 function modelsToTry(): string[] {
-  const primary = getGeminiModel();
-  if (primary === FALLBACK_MODEL) return [primary];
-  return [primary, FALLBACK_MODEL];
+  const preferred = getGeminiModel();
+  const chain = [preferred, ...SUPPORTED_MODELS.filter((m) => m !== preferred)];
+  return [...new Set(chain)];
 }
 
 export function getEnvStatus(): "missing" | "placeholder" | "valid" {
@@ -78,10 +88,14 @@ function isQuotaError(msg: string): boolean {
   return (
     lc.includes("quota") ||
     lc.includes("rate limit") ||
-    lc.includes("rate-limit") ||
     lc.includes("resource_exhausted") ||
     lc.includes("limit: 0")
   );
+}
+
+function isNotFoundError(msg: string): boolean {
+  const lc = msg.toLowerCase();
+  return lc.includes("not found") || lc.includes("not supported");
 }
 
 function noGeminiKeyMessage(): string {
@@ -93,20 +107,24 @@ Add \`GEMINI_API_KEY\` in Vercel → Settings → Environment Variables (no quot
 function quotaExceededMessage(triedModels: string[]): string {
   return `### Gemini quota exceeded
 
-Your Google API free tier for **${triedModels.join(", ")}** is used up or not enabled on this key.
+Tried: **${triedModels.join(" → ")}**
 
-**Try this:**
-1. In Vercel, set \`GEMINI_MODEL\` to \`gemini-1.5-flash\` (or remove it to use the default), then **Redeploy**
-2. Wait a few minutes and send again
-3. Enable billing: [Google AI Studio](https://aistudio.google.com/) → Settings
-4. Or create a new API key: https://aistudio.google.com/apikey
+Your free-tier limit is used up on these models.
 
-Your app and API key are working — this is a **Google usage limit**, not a Vercel bug.`;
+**Fix:**
+1. Set \`GEMINI_MODEL=gemini-2.0-flash-lite\` in Vercel (lighter quota) and redeploy
+2. Wait a few minutes and try again
+3. Enable billing: https://aistudio.google.com/
+4. New API key: https://aistudio.google.com/apikey`;
 }
 
-function geminiFailedMessage(triedModels: string[]): string {
-  const detail = lastGeminiError ? `\n\n**Details:** ${lastGeminiError.slice(0, 400)}` : "";
-  return `### Could not reach Gemini (${triedModels.join(" → ")})${detail}`;
+function allModelsFailedMessage(triedModels: string[]): string {
+  const detail = lastGeminiError ? `\n\n**Last error:** ${lastGeminiError.slice(0, 500)}` : "";
+  return `### Could not reach Gemini
+
+Tried: **${triedModels.join(" → ")}**${detail}
+
+Set \`GEMINI_MODEL\` to one of: ${SUPPORTED_MODELS.join(", ")}`;
 }
 
 async function callGeminiOnce(apiKey: string, model: string, message: string): Promise<string | null> {
@@ -180,19 +198,26 @@ export async function sendMessageToAI(message: string): Promise<{ text: string; 
   }
 
   const models = modelsToTry();
+  let sawQuota = false;
 
   for (const model of models) {
     const text = await callGeminiOnce(geminiKey, model, message);
     if (text) {
       return { text, provider: `Google Gemini (${model})` };
     }
+
+    if (isQuotaError(lastGeminiError)) sawQuota = true;
+    // Skip to next model on quota or deprecated/not-found
+    if (!isQuotaError(lastGeminiError) && !isNotFoundError(lastGeminiError)) {
+      break;
+    }
   }
 
-  if (isQuotaError(lastGeminiError)) {
+  if (sawQuota) {
     return { text: quotaExceededMessage(models), provider: "Quota" };
   }
 
-  return { text: geminiFailedMessage(models), provider: "Gemini Error" };
+  return { text: allModelsFailedMessage(models), provider: "Gemini Error" };
 }
 
 export function getHealthResponse(): HealthResponse {
@@ -200,6 +225,7 @@ export function getHealthResponse(): HealthResponse {
   return {
     status: "ok",
     timestamp: new Date().toISOString(),
+    build: API_BUILD,
     config: {
       geminiEnabled: isValidKey(),
       geminiModel: getGeminiModel(),

@@ -29,6 +29,7 @@ export interface HistoryResponse {
 export interface HealthResponse {
   status: string;
   timestamp: string;
+  build?: string;
   config: {
     geminiEnabled: boolean;
     geminiModel: string;

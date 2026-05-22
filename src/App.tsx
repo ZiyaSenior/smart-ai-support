@@ -425,6 +425,12 @@ export default function App() {
                     {health?.config?.onVercel ? "YES" : "NO"}
                   </span>
                 </li>
+                <li className="flex justify-between">
+                  <span className="text-slate-500">API_BUILD</span>
+                  <span className={`font-bold truncate max-w-[7rem] ${health?.build === "gemini-v4-no-15" ? "text-emerald-600" : "text-rose-500"}`}>
+                    {health?.build || "OLD — redeploy"}
+                  </span>
+                </li>
               </ul>
             </div>
 
