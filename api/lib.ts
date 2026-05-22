@@ -5,36 +5,35 @@ if (!process.env.VERCEL) {
   dotenv.config({ path: ".env" });
 }
 
-/** Models that exist on generativelanguage.googleapis.com v1beta (2026). */
+/** Models that exist on Groq's Chat Completions API (OpenAI-compatible, 2026). */
 const SUPPORTED_MODELS = [
-  "gemini-2.0-flash-lite",
-  "gemini-2.0-flash",
-  "gemini-2.5-flash",
-  "gemini-2.5-flash-preview-05-20",
+  "llama-3.1-8b-instant",
+  "llama-3.1-70b-versatile",
+  "llama-3.3-70b-versatile",
 ] as const;
 
-const DEFAULT_MODEL = "gemini-2.0-flash-lite";
+const DEFAULT_MODEL = "llama-3.1-8b-instant";
 
 /** Bump when deploying — shown in /api/health so you know Vercel picked up the latest code. */
-export const API_BUILD = "gemini-v4-no-15";
+export const API_BUILD = "groq-v1-no-1";
 
 export interface HealthResponse {
   status: string;
   timestamp: string;
   build: string;
   config: {
-    geminiEnabled: boolean;
-    geminiModel: string;
-    geminiEnvStatus: "missing" | "placeholder" | "valid";
+    groqEnabled: boolean;
+    groqModel: string;
+    groqEnvStatus: "missing" | "placeholder" | "valid";
     keyLength: number;
     onVercel: boolean;
   };
 }
 
-let lastGeminiError = "";
+let lastGroqError = "";
 
-export function getGeminiApiKey(): string | undefined {
-  const raw = process.env.GEMINI_API_KEY;
+export function getGroqApiKey(): string | undefined {
+  const raw = process.env.GROQ_API_KEY;
   if (!raw) return undefined;
 
   let key = raw.trim();
@@ -47,32 +46,33 @@ export function getGeminiApiKey(): string | undefined {
   return key || undefined;
 }
 
-export function getGeminiModel(): string {
-  return process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
+export function getGroqModel(): string {
+  return process.env.GROQ_MODEL?.trim() || DEFAULT_MODEL;
 }
 
 function modelsToTry(): string[] {
-  const preferred = getGeminiModel();
+  const preferred = getGroqModel();
   const chain = [preferred, ...SUPPORTED_MODELS.filter((m) => m !== preferred)];
   return [...new Set(chain)];
 }
 
 export function getEnvStatus(): "missing" | "placeholder" | "valid" {
-  const normalized = getGeminiApiKey();
+  const normalized = getGroqApiKey();
   if (!normalized) return "missing";
 
   const lc = normalized.toLowerCase();
   if (
     lc.includes("your_api_key") ||
     lc.includes("placeholder") ||
-    lc.includes("my_gemini") ||
+    lc.includes("my_groq") ||
     lc === "none" ||
     lc === "null"
   ) {
     return "placeholder";
   }
 
-  if (!normalized.startsWith("AIza")) {
+  // Groq keys typically start with gsk_ (treat other formats as likely misconfiguration).
+  if (!normalized.startsWith("gsk_")) {
     return "placeholder";
   }
 
@@ -88,6 +88,9 @@ function isQuotaError(msg: string): boolean {
   return (
     lc.includes("quota") ||
     lc.includes("rate limit") ||
+    lc.includes("too many requests") ||
+    lc.includes("429") ||
+    lc.includes("insufficient_quota") ||
     lc.includes("resource_exhausted") ||
     lc.includes("limit: 0")
   );
@@ -95,40 +98,44 @@ function isQuotaError(msg: string): boolean {
 
 function isNotFoundError(msg: string): boolean {
   const lc = msg.toLowerCase();
-  return lc.includes("not found") || lc.includes("not supported");
+  return (
+    lc.includes("not found") ||
+    lc.includes("not supported") ||
+    lc.includes("unknown model") ||
+    (lc.includes("model") && lc.includes("does not exist"))
+  );
 }
 
-function noGeminiKeyMessage(): string {
-  return `### Gemini not configured
+function noGroqKeyMessage(): string {
+  return `### Groq not configured
 
-Add \`GEMINI_API_KEY\` in Vercel → Settings → Environment Variables (no quotes), then redeploy.`;
+Add \`GROQ_API_KEY\` in Vercel → Settings → Environment Variables (no quotes), then redeploy.`;
 }
 
 function quotaExceededMessage(triedModels: string[]): string {
-  return `### Gemini quota exceeded
+  return `### Groq rate limit / quota exceeded
 
 Tried: **${triedModels.join(" → ")}**
 
 Your free-tier limit is used up on these models.
 
 **Fix:**
-1. Set \`GEMINI_MODEL=gemini-2.0-flash-lite\` in Vercel (lighter quota) and redeploy
+1. Set \`GROQ_MODEL=llama-3.1-8b-instant\` in Vercel (lighter/faster) and redeploy
 2. Wait a few minutes and try again
-3. Enable billing: https://aistudio.google.com/
-4. New API key: https://aistudio.google.com/apikey`;
+3. Check Groq account limits / billing in the Groq console`;
 }
 
 function allModelsFailedMessage(triedModels: string[]): string {
-  const detail = lastGeminiError ? `\n\n**Last error:** ${lastGeminiError.slice(0, 500)}` : "";
-  return `### Could not reach Gemini
+  const detail = lastGroqError ? `\n\n**Last error:** ${lastGroqError.slice(0, 500)}` : "";
+  return `### Could not reach Groq
 
 Tried: **${triedModels.join(" → ")}**${detail}
 
-Set \`GEMINI_MODEL\` to one of: ${SUPPORTED_MODELS.join(", ")}`;
+Set \`GROQ_MODEL\` to one of: ${SUPPORTED_MODELS.join(", ")}`;
 }
 
-async function callGeminiOnce(apiKey: string, model: string, message: string): Promise<string | null> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+async function callGroqOnce(apiKey: string, model: string, message: string): Promise<string | null> {
+  const url = "https://api.groq.com/openai/v1/chat/completions";
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 25000);
@@ -136,14 +143,22 @@ async function callGeminiOnce(apiKey: string, model: string, message: string): P
   try {
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: message }] }],
-        systemInstruction: {
-          parts: [{
-            text: "You are an expert customer support agent. Be professional and concise. Use Markdown.",
-          }],
-        },
+        model,
+        temperature: 0.2,
+        max_tokens: 900,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are an expert customer support agent. Be professional and concise. Use Markdown.",
+          },
+          { role: "user", content: message },
+        ],
       }),
       signal: controller.signal,
     });
@@ -157,33 +172,26 @@ async function callGeminiOnce(apiKey: string, model: string, message: string): P
       } catch {
         hint = errBody.slice(0, 400) || hint;
       }
-      lastGeminiError = hint;
-      console.error("[GEMINI]", model, hint);
+      lastGroqError = hint;
+      console.error("[GROQ]", model, hint);
       return null;
     }
 
     const data = (await res.json()) as {
-      candidates?: { content?: { parts?: { text?: string }[] } }[];
-      promptFeedback?: { blockReason?: string };
+      choices?: { message?: { content?: string } }[];
     };
 
-    const blockReason = data?.promptFeedback?.blockReason;
-    if (blockReason) {
-      lastGeminiError = `Blocked: ${blockReason}`;
-      return null;
-    }
-
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const text = data?.choices?.[0]?.message?.content;
     if (!text) {
-      lastGeminiError = "Empty response from Gemini";
+      lastGroqError = "Empty response from Groq";
       return null;
     }
 
-    lastGeminiError = "";
+    lastGroqError = "";
     return text;
   } catch (err: unknown) {
-    lastGeminiError = err instanceof Error ? err.message : String(err);
-    console.error("[GEMINI]", model, lastGeminiError);
+    lastGroqError = err instanceof Error ? err.message : String(err);
+    console.error("[GROQ]", model, lastGroqError);
     return null;
   } finally {
     clearTimeout(timeoutId);
@@ -191,24 +199,24 @@ async function callGeminiOnce(apiKey: string, model: string, message: string): P
 }
 
 export async function sendMessageToAI(message: string): Promise<{ text: string; provider: string }> {
-  const geminiKey = getGeminiApiKey();
+  const groqKey = getGroqApiKey();
 
-  if (!isValidKey() || !geminiKey) {
-    return { text: noGeminiKeyMessage(), provider: "Configuration" };
+  if (!isValidKey() || !groqKey) {
+    return { text: noGroqKeyMessage(), provider: "Configuration" };
   }
 
   const models = modelsToTry();
   let sawQuota = false;
 
   for (const model of models) {
-    const text = await callGeminiOnce(geminiKey, model, message);
+    const text = await callGroqOnce(groqKey, model, message);
     if (text) {
-      return { text, provider: `Google Gemini (${model})` };
+      return { text, provider: `Groq (${model})` };
     }
 
-    if (isQuotaError(lastGeminiError)) sawQuota = true;
+    if (isQuotaError(lastGroqError)) sawQuota = true;
     // Skip to next model on quota or deprecated/not-found
-    if (!isQuotaError(lastGeminiError) && !isNotFoundError(lastGeminiError)) {
+    if (!isQuotaError(lastGroqError) && !isNotFoundError(lastGroqError)) {
       break;
     }
   }
@@ -217,19 +225,19 @@ export async function sendMessageToAI(message: string): Promise<{ text: string; 
     return { text: quotaExceededMessage(models), provider: "Quota" };
   }
 
-  return { text: allModelsFailedMessage(models), provider: "Gemini Error" };
+  return { text: allModelsFailedMessage(models), provider: "Groq Error" };
 }
 
 export function getHealthResponse(): HealthResponse {
-  const key = getGeminiApiKey();
+  const key = getGroqApiKey();
   return {
     status: "ok",
     timestamp: new Date().toISOString(),
     build: API_BUILD,
     config: {
-      geminiEnabled: isValidKey(),
-      geminiModel: getGeminiModel(),
-      geminiEnvStatus: getEnvStatus(),
+      groqEnabled: isValidKey(),
+      groqModel: getGroqModel(),
+      groqEnvStatus: getEnvStatus(),
       keyLength: key?.length ?? 0,
       onVercel: Boolean(process.env.VERCEL),
     },

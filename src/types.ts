@@ -31,9 +31,9 @@ export interface HealthResponse {
   timestamp: string;
   build?: string;
   config: {
-    geminiEnabled: boolean;
-    geminiModel: string;
-    geminiEnvStatus: "missing" | "placeholder" | "valid";
+    groqEnabled: boolean;
+    groqModel: string;
+    groqEnvStatus: "missing" | "placeholder" | "valid";
     keyLength?: number;
     onVercel?: boolean;
   };

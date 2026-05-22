@@ -5,7 +5,7 @@ import { API_BUILD } from "./lib";
 export default function handler(_req: VercelRequest, res: VercelResponse) {
   return res.status(200).json({
     build: API_BUILD,
-    models: ["gemini-2.0-flash-lite", "gemini-2.0-flash", "gemini-2.5-flash"],
-    note: "If build is not gemini-v4-no-15, push git and redeploy on Vercel.",
+    models: ["llama-3.1-8b-instant", "llama-3.1-70b-versatile", "llama-3.3-70b-versatile"],
+    note: "If build is not groq-v1-no-1, push git and redeploy on Vercel.",
   });
 }

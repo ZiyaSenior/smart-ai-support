@@ -18,7 +18,7 @@ let chatHistory: Message[] = [
   {
     id: "welcome-message",
     sender: "bot",
-    text: "Hello! I'm your Smart AI Support Assistant, powered by Google Gemini. How can I help you today?",
+    text: "Hello! I'm your Smart AI Support Assistant, powered by Groq. How can I help you today?",
     timestamp: Date.now(),
     providerUsed: "System Welcome",
   },
@@ -60,7 +60,7 @@ app.post("/api/chat", async (req, res) => {
       text,
       timestamp: Date.now(),
       providerUsed: provider,
-      isError: provider === "Gemini Error" || provider === "Configuration",
+      isError: provider === "Groq Error" || provider === "Configuration" || provider === "Quota",
     };
     chatHistory.push(botMessage);
 
